@@ -1,15 +1,13 @@
 <!doctype html>
 <html lang="es">
 <head>
-<title>Visor F5 (Primera Fase)</title>
+<title>Visor 3D</title>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
 <style>
     body { margin: 0; overflow: hidden; }
 </style>
 <script src="js/jquery-2.1.4.js"></script> 
-<script src="js/bootstrap.min.js"></script>
-<link rel="stylesheet" type="text/css" href="css/bootstrap.css"> 
 <link rel="stylesheet" type="text/css" href="css/main.css"> 
 </head>
 <body>
@@ -18,7 +16,48 @@
 <script src="threejs/three.min.js"></script>
 <script src="threejs/OrbitControls.js"></script> 
 <script src="threejs/TerrainLoader.js"></script> 
+
+
+//----------------------------------------------------------
+//   SHADERS
+//----------------------------------------------------------
+
+<script id="fragment_shh" type="x-shader/x-fragment">
+			#ifdef GL_ES
+			precision highp float;
+			#endif
+
+			uniform sampler2D tOne;
+			uniform sampler2D tSec;
+
+			varying vec2 vUv;
+			
+			void main(void)
+			{
+				vec3 c;
+				vec4 Ca = texture2D(tOne, vUv);
+				vec4 Cb = texture2D(tSec, vUv);
+				c = Ca.rgb * Ca.a + Cb.rgb * Cb.a * (1.0 - Ca.a);
+			    gl_FragColor= vec4(c, 1.0);
+				
+			}
+			
+		</script>
+<script id="vertex_shh" type="x-shader/x-vertex">
+		
+			varying vec2 vUv;
+			
+			void main()
+			{
+				vUv = uv;
+				vec4 mvPosition = modelViewMatrix * vec4( position, 1.0 );
+				gl_Position = projectionMatrix * mvPosition;
+			}
+			
+</script>
+
 <script>
+
 //----------------------------------------------------------
 //   FUNCIONES PARA RENDERIZAR ETIQUETAS
 //----------------------------------------------------------
@@ -98,27 +137,48 @@
     var renderer = new THREE.WebGLRenderer();
     renderer.setSize(width, height);
     document.getElementById('webgl').appendChild(renderer.domElement);
-    
+ 
+//----------------------------------------------------------
+//    INICIO INCENDIO   
+//----------------------------------------------------------
+
+    var incendio_geometry = new THREE.SphereGeometry(2, 32, 32);
+    var incendio_material = new THREE.MeshBasicMaterial( {color: 'red'} );
+    var incendio = new THREE.Mesh( incendio_geometry, incendio_material );
+    incendio.position.set( 34.4, -1.0, 22.2 );
+    scene.add( incendio );
+
 //----------------------------------------------------------
 //  LEER MDT.BIN Y RENDERIZAR TERRENO
 //----------------------------------------------------------
 
     var terrainLoader = new THREE.TerrainLoader();
-    terrainLoader.load('images/mdt.bin', function(data) {
+    terrainLoader.load('images/mdt_almorox.bin', function(data) {
 
-        var attributes = {}; // custom attributes
+        var vertShader = document.getElementById('vertex_shh').innerHTML;
+        var fragShader = document.getElementById('fragment_shh').innerHTML;
 
-	var textureLoader = new THREE.TextureLoader();
-	var diffuse = textureLoader.load('images/pnoa_.jpg');
+        var texloader = new THREE.TextureLoader();
 
-        var material = new THREE.MeshLambertMaterial({ map: diffuse });
-        
-        var geometry = new THREE.PlaneGeometry(300, 300, 249, 249);
-        
+        var uniforms = {    // custom uniforms (your textures)
+
+            tOne: { type: "t", value: "" },
+            tSec: { type: "t", value: texloader.load( 'images/pnoa_almorox.jpg' ) }
+
+        };
+        var material_shh = new THREE.ShaderMaterial({
+
+            uniforms: uniforms,
+            vertexShader: vertShader,
+            fragmentShader: fragShader
+        });
+
+        var geometry = new THREE.PlaneGeometry(300, 300, 499, 499);
+
         for (var i = 0, l = geometry.vertices.length; i < l; i++) {
-            geometry.vertices[i].z = data[i] / 65535 * 210;
+            geometry.vertices[i].z = data[i] / 65535 * 110;
         }
-        var plane = new THREE.Mesh(geometry, material);
+        var plane = new THREE.Mesh(geometry, material_shh);
         plane.name = 'plano';
         scene.add(plane);
     });
@@ -181,9 +241,9 @@
     loader.load( 'flecha.json', addModel );
     
     function addModel( geometry, materials ) {
-        var material = new THREE.MeshBasicMaterial( { color: 0x990000 } );
+        var material = new THREE.MeshFaceMaterial( materials );
         model = new THREE.Mesh( geometry, material );
-        model.scale.set(8,8,8);
+        model.scale.set(50,50,50);
         model.position.set(0,0,0);
         scene2.add( model );
     }
